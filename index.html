@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#2457d6">
+<title>국내 출장비 계산기</title>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  :root {
+    --bg: #f4f6fa;
+    --card: #ffffff;
+    --ink: #1c2433;
+    --sub: #5d6779;
+    --line: #d7ddea;
+    --accent: #2457d6;
+    --accent-ink: #ffffff;
+    --accent-soft: #e8eefc;
+    --warn: #a24a07;
+    --warn-soft: #fdf0e1;
+    --tap: 48px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 16px;
+    line-height: 1.4;
+    overflow: hidden;
+    overflow-x: hidden;
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+  }
+  button, input { touch-action: manipulation; }
+
+  .app {
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    max-width: 960px;
+    margin: 0 auto;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px 10px;
+    padding-top: calc(12px + env(safe-area-inset-top));
+  }
+  header svg { width: 24px; height: 24px; stroke-width: 1.75; color: var(--accent); flex: 0 0 auto; }
+  header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+  header h1 { margin-right: auto; }
+  .head-btn {
+    flex: 0 0 auto;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    min-height: 44px; padding: 0 14px;
+    font: inherit; font-size: 15px; font-weight: 700;
+    color: var(--accent); background: var(--card);
+    border: 1.5px solid var(--line); border-radius: 12px; cursor: pointer;
+  }
+  .head-btn svg { width: 18px; height: 18px; stroke-width: 2; }
+  .head-btn:active { background: var(--accent-soft); }
+  header .tag {
+    font-size: 13px;
+    color: var(--sub);
+    border: 1px solid var(--line);
+    background: var(--card);
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  main { flex: 1 1 auto; min-height: 0; padding: 0 16px 12px; }
+  .panel { display: none; height: 100%; min-width: 0; }
+  .panel.active { display: block; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 14px 16px;
+    min-height: 0;
+    min-width: 0;
+  }
+
+  /* ===== 계산 탭 ===== */
+  .calc-grid {
+    height: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 14px;
+  }
+  .input-card { overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+
+  .seg {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 3px;
+    gap: 3px;
+  }
+  .seg button {
+    border: 0;
+    background: transparent;
+    min-height: 44px;
+    padding: 0 6px;
+    border-radius: 9px;
+    font: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--sub);
+    cursor: pointer;
+  }
+  .seg button.on { background: var(--card); color: var(--accent); box-shadow: 0 1px 3px rgba(20,30,60,.16); }
+  .mode-seg { margin-bottom: 12px; }
+
+  .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .field.full { grid-column: 1 / -1; }
+  label, .lbl { font-size: 14px; color: var(--sub); font-weight: 700; }
+
+  input[type="text"], input[type="date"] {
+    font: inherit;
+    font-size: 17px;            /* 16px 이상: iOS 자동 확대 방지 */
+    height: var(--tap);
+    padding: 0 12px;
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+    color: var(--ink);
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  input[type="date"] { padding: 0 8px; }
+  input:focus-visible, button:focus-visible {
+    outline: 3px solid rgba(36,87,214,.45);
+    outline-offset: 1px;
+    border-color: var(--accent);
+  }
+  .unit-wrap { position: relative; }
+  .unit-wrap input { padding-right: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+  .unit-wrap span {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--sub); font-size: 15px; pointer-events: none;
+  }
+
+  .chips { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+  .chips button {
+    min-height: 44px;
+    border: 1.5px solid var(--line);
+    background: #fff;
+    border-radius: 12px;
+    font: inherit; font-size: 15px; font-weight: 700;
+    color: var(--ink);
+    cursor: pointer;
+    padding: 0 4px;
+    white-space: nowrap;
+  }
+  .chips button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .hint { font-size: 14px; color: var(--sub); margin-top: 12px; }
+  .hide { display: none !important; }
+
+  /* 합계 카드 */
+  .total-card { display: flex; flex-direction: column; overflow: hidden; }
+  .total-head { display: flex; align-items: flex-start; gap: 8px; }
+  .total-head .grow { flex: 1 1 auto; min-width: 0; }
+  .total-label { font-size: 14px; color: var(--sub); font-weight: 700; }
+  .total-amount {
+    font-size: 36px; font-weight: 800; letter-spacing: -0.02em;
+    color: var(--accent); margin: 2px 0 0; line-height: 1.15;
+    font-variant-numeric: tabular-nums; word-break: keep-all;
+  }
+  .period { font-size: 14px; color: var(--sub); margin: 2px 0 12px; }
+  .icon-btn {
+    flex: 0 0 auto;
+    min-width: var(--tap); height: var(--tap); padding: 0 12px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    font: inherit; font-size: 15px; font-weight: 700;
+    border: 1.5px solid var(--line); background: #fff; color: var(--accent);
+    border-radius: 12px; cursor: pointer;
+  }
+  .icon-btn svg { width: 22px; height: 22px; stroke-width: 1.75; }
+  .icon-btn:active { background: var(--accent-soft); }
+  .mini { list-style: none; border-top: 1px solid var(--line); }
+  .mini li {
+    display: flex; justify-content: space-between; gap: 8px;
+    padding: 9px 0; border-bottom: 1px solid var(--line);
+    font-size: 16px;
+  }
+  .mini li span:first-child { color: var(--sub); }
+  .mini li span:last-child { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .mini li .w { font-style: normal; }
+  .alert {
+    margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+    background: var(--warn-soft); color: var(--warn);
+    font-size: 14px; display: flex; gap: 8px; align-items: flex-start;
+  }
+  .alert svg { width: 18px; height: 18px; stroke-width: 2; flex: 0 0 auto; margin-top: 1px; }
+  .error { background: #fdecec; color: #a32121; }
+  .copy-note { font-size: 14px; color: var(--accent); font-weight: 700; min-height: 20px; }
+
+  /* ===== 결과 / 기준 / 안내 ===== */
+  .scroll-safe { overflow-y: auto; overflow-x: hidden; height: 100%; -webkit-overflow-scrolling: touch; }
+  h2 { font-size: 17px; margin-bottom: 10px; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 16px; }
+  th, td { padding: 12px 6px; text-align: left; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; vertical-align: top; }
+  th { color: var(--sub); font-size: 14px; font-weight: 700; }
+  col.c1 { width: 22%; } col.c2 { width: 46%; } col.c3 { width: 32%; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.calc { color: var(--sub); font-size: 15px; }
+  tr.sum td { font-weight: 800; font-size: 18px; color: var(--accent); border-bottom: 0; }
+  .row-actions { display: flex; gap: 10px; margin-top: 14px; align-items: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font: inherit; font-size: 16px; font-weight: 700;
+    min-height: 50px; padding: 0 18px; border-radius: 12px; cursor: pointer;
+    border: 1.5px solid var(--line); background: #fff; color: var(--ink);
+  }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn svg { width: 20px; height: 20px; stroke-width: 2; }
+  .toast { font-size: 14px; color: var(--sub); min-height: 20px; }
+
+  .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .notes { list-style: none; display: grid; gap: 12px; font-size: 16px; line-height: 1.55; }
+  .notes li { display: flex; gap: 10px; min-width: 0; }
+  .notes svg { width: 20px; height: 20px; stroke-width: 2; color: var(--accent); flex: 0 0 auto; margin-top: 2px; }
+  .notes span { min-width: 0; overflow-wrap: anywhere; }
+
+  /* ===== 하단 탭 ===== */
+  nav {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    background: var(--card);
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  nav button {
+    border: 0; background: transparent; cursor: pointer;
+    min-height: 58px;
+    padding: 7px 4px 6px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    font: inherit; font-size: 13px; font-weight: 700; color: var(--sub);
+  }
+  nav button svg { width: 24px; height: 24px; stroke-width: 1.75; }
+  nav button.on { color: var(--accent); }
+  nav button.on svg { stroke-width: 2.25; }
+  .typing nav { display: none; }   /* 키보드가 열려 있을 때 하단 탭을 숨겨 입력 공간 확보 */
+
+  /* ===== 모바일 ===== */
+  @media (max-width: 720px) {
+    header { padding: 8px 14px 6px; padding-top: calc(8px + env(safe-area-inset-top)); }
+    header h1 { font-size: 18px; }
+    header .tag { display: none; }
+    main { padding: 0 12px 10px; }
+    .calc-grid {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 10px;
+    }
+    .total-card { order: -1; padding: 10px 14px 12px; }
+    .total-amount { font-size: 32px; }
+    .period { margin-bottom: 8px; }
+    .mini { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; border-top: 0; }
+    .mini li {
+      flex-direction: column; align-items: flex-start; gap: 0;
+      padding: 6px 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+      font-size: 13px;
+    }
+    .mini li span:first-child { font-size: 13px; }
+    .mini li span:last-child { font-size: 14px; white-space: nowrap; }
+    .mini li .w { display: none; font-style: normal; }
+    .total-card .alert { margin-top: 8px; padding: 8px 10px; }
+    .input-card { padding: 12px 14px; }
+    .fields { gap: 10px; }
+    .hint { display: none; }
+    .settings-grid { grid-template-columns: minmax(0, 1fr); }
+    .row-actions .btn { flex: 1 1 0; }
+    .row-actions .toast { flex-basis: 100%; }
+  }
+  @media (max-width: 359px) {
+    .total-amount { font-size: 28px; }
+    .chips button { font-size: 14px; }
+    .mini li span:last-child { font-size: 13px; }
+  }
+  @media (max-height: 640px) and (max-width: 720px) {
+    .total-amount { font-size: 28px; }
+    .period { margin-bottom: 6px; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <i data-lucide="calculator"></i>
+    <h1>국내 출장비 계산기</h1>
+    <button type="button" class="head-btn" id="reset-calc" aria-label="입력 초기화"><i data-lucide="rotate-ccw"></i><span>초기화</span></button>
+    <span class="tag">2026 기준</span>
+  </header>
+
+  <main>
+    <!-- 계산 -->
+    <section class="panel active" id="tab-calc">
+      <div class="calc-grid">
+        <div class="card input-card">
+          <div class="seg mode-seg" role="radiogroup" aria-label="출장 구분">
+            <button type="button" id="mode-out" class="on" role="radio" aria-checked="true">근무지 외 출장</button>
+            <button type="button" id="mode-in" role="radio" aria-checked="false">근무지 내 출장</button>
+          </div>
+
+          <div class="fields" id="fields-out">
+            <div class="field full">
+              <span class="lbl">기간</span>
+              <div class="chips" id="chips" role="group" aria-label="기간 빠른 선택">
+                <button type="button" data-n="0">당일</button>
+                <button type="button" data-n="1">1박 2일</button>
+                <button type="button" data-n="2">2박 3일</button>
+                <button type="button" data-n="3">3박 4일</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="dep">출발일</label>
+              <input type="date" id="dep">
+            </div>
+            <div class="field">
+              <label for="arr">도착일</label>
+              <input type="date" id="arr">
+            </div>
+            <div class="field full">
+              <span class="lbl">숙박 지역</span>
+              <div class="seg" id="region-seg" role="radiogroup" aria-label="숙박 지역">
+                <button type="button" data-r="seoul" class="on" role="radio" aria-checked="true">서울</button>
+                <button type="button" data-r="metro" role="radio" aria-checked="false">광역시</button>
+                <button type="button" data-r="etc" role="radio" aria-checked="false">그 밖</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="lodging">박당 숙박비</label>
+              <div class="unit-wrap"><input type="text" id="lodging" inputmode="numeric" pattern="[0-9]*" enterkeyhint="next" autocomplete="off" placeholder="0"><span>원</span></div>
+            </div>
+            <div class="field">
+              <label for="transport">교통비 합계</label>
+              <div class="unit-wrap"><input type="text" id="transport" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" autocomplete="off" placeholder="0"><span>원</span></div>
+            </div>
+          </div>
+
+          <div class="fields hide" id="fields-in">
+            <div class="field full">
+              <span class="lbl">출장 시간</span>
+              <div class="chips" id="hour-chips" role="group" aria-label="시간 빠른 선택">
+                <button type="button" data-h="2">2시간</button>
+                <button type="button" data-h="4">4시간</button>
+                <button type="button" data-h="6">6시간</button>
+                <button type="button" data-h="8">8시간</button>
+              </div>
+            </div>
+            <div class="field full">
+              <label for="hours">직접 입력</label>
+              <div class="unit-wrap"><input type="text" id="hours" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="0"><span>시간</span></div>
+            </div>
+          </div>
+          <p class="hint" id="hint">연습용 계산기입니다. 실제 정산은 소속 기관 규정을 확인하세요.</p>
+        </div>
+
+        <div class="card total-card" aria-live="polite">
+          <div class="total-head">
+            <div class="grow">
+              <div class="total-label">예상 출장비 합계</div>
+              <div class="total-amount" id="total">0원</div>
+              <div class="period" id="period"></div>
+            </div>
+            <button type="button" class="icon-btn" id="copy-quick" aria-label="결과 복사"><i data-lucide="copy"></i><span>복사</span></button>
+          </div>
+          <ul class="mini" id="mini"></ul>
+          <div id="msgs"></div>
+          <div class="copy-note" id="copy-note"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 결과 -->
+    <section class="panel" id="tab-result">
+      <div class="card scroll-safe">
+        <h2>항목별 계산 내역</h2>
+        <table>
+          <colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+          <thead><tr><th>항목</th><th>산식</th><th class="num">금액</th></tr></thead>
+          <tbody id="result-body"></tbody>
+        </table>
+        <div class="row-actions">
+          <button type="button" class="btn primary" id="copy"><i data-lucide="copy"></i>결과 복사</button>
+          <span class="toast" id="toast"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 기준 -->
+    <section class="panel" id="tab-rates">
+      <div class="card scroll-safe">
+        <h2>기준 금액</h2>
+        <div class="settings-grid">
+          <div class="field"><label for="r-daily">일비 (1일)</label><div class="unit-wrap"><input type="text" id="r-daily" inputmode="numeric" pattern="[0-9]*" autocomplete="off"><span>원</span></div></div>
+          <div class="field"><label for="r-meal">식비 (1일)</label><div class="unit-wrap"><input type="text" id="r-meal" inputmode="numeric" pattern="[0-9]*" autocomplete="off"><span>원</span></div></div>
+          <div class="field"><label for="r-seoul">숙박비 상한 - 서울 (1박)</label><div class="unit-wrap"><input type="text" id="r-seoul" inputmode="numeric" pattern="[0-9]*" autocomplete="off"><span>원</span></div></div>
+          <div class="field"><label for="r-metro">숙박비 상한 - 광역시 (1박)</label><div class="unit-wrap"><input type="text" id="r-metro" inputmode="numeric" pattern="[0-9]*" autocomplete="off"><span>원</span></div></div>
+          <div class="field"><label for="r-etc">숙박비 상한 - 그 밖의 지역 (1박)</label><div class="unit-wrap"><input type="text" id="r-etc" inputmode="numeric" pattern="[0-9]*" autocomplete="off"><span>원</span></div></div>
+          <div class="field"><label for="r-in-long">근무지 내 - 4시간 이상</label><div class="unit-wrap"><input type="text" id="r-in-long" inputmode="numeric" pattern="[0-9]*" autocomplete="off"><span>원</span></div></div>
+          <div class="field"><label for="r-in-short">근무지 내 - 4시간 미만</label><div class="unit-wrap"><input type="text" id="r-in-short" inputmode="numeric" pattern="[0-9]*" autocomplete="off"><span>원</span></div></div>
+        </div>
+        <div class="row-actions">
+          <button type="button" class="btn primary" id="save"><i data-lucide="save"></i>저장</button>
+          <button type="button" class="btn" id="reset"><i data-lucide="rotate-ccw"></i>기본값 복원</button>
+          <span class="toast" id="rate-toast"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 안내 -->
+    <section class="panel" id="tab-info">
+      <div class="card scroll-safe">
+        <h2>적용 기준과 계산 방식</h2>
+        <ul class="notes">
+          <li><i data-lucide="info"></i><span>기본 기준값은 「공무원 여비 규정」 별표 2 국내 여비 지급표 제2호입니다. 이 앱은 연습용이며 실제 정산 금액은 소속 기관의 여비규정을 따릅니다.</span></li>
+          <li><i data-lucide="calendar-days"></i><span>여행일수 = 도착일 - 출발일 + 1, 박수 = 여행일수 - 1</span></li>
+          <li><i data-lucide="banknote"></i><span>일비와 식비는 여행일수에 1일 기준 금액을 곱합니다.</span></li>
+          <li><i data-lucide="bed-double"></i><span>숙박비 = 박수 x 박당 실제 숙박비와 지역별 상한 중 작은 금액. 상한을 넘는 부분은 인정되지 않습니다.</span></li>
+          <li><i data-lucide="train-front"></i><span>교통비는 입력한 실비를 그대로 더합니다.</span></li>
+          <li><i data-lucide="map-pin"></i><span>근무지 내 출장은 시간 기준 정액만 지급하며, 다른 항목은 계산하지 않습니다.</span></li>
+          <li><i data-lucide="rotate-ccw"></i><span>상단의 초기화 버튼은 계산 탭의 입력값만 비웁니다. 기준 금액은 기준 탭의 기본값 복원으로 되돌립니다.</span></li>
+          <li><i data-lucide="save"></i><span>기준 탭에서 수정한 금액과 마지막 입력값(지역, 숙박비, 교통비)은 이 기기의 브라우저에만 저장됩니다.</span></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <nav aria-label="화면 이동">
+    <button type="button" data-tab="calc" class="on"><i data-lucide="calculator"></i>계산</button>
+    <button type="button" data-tab="result"><i data-lucide="receipt"></i>결과</button>
+    <button type="button" data-tab="rates"><i data-lucide="settings-2"></i>기준</button>
+    <button type="button" data-tab="info"><i data-lucide="info"></i>안내</button>
+  </nav>
+</div>
+
+<script>
+(function () {
+  var DEFAULTS = { daily: 25000, meal: 25000, seoul: 100000, metro: 80000, etc: 70000, inLong: 20000, inShort: 10000 };
+  var REGION_NAME = { seoul: '서울특별시', metro: '광역시', etc: '그 밖의 지역' };
+  var RATE_KEY = 'travel-calc-rates-v1';
+  var LAST_KEY = 'travel-calc-last-v2';
+  var RATE_MAP = { daily: 'r-daily', meal: 'r-meal', seoul: 'r-seoul', metro: 'r-metro', etc: 'r-etc', inLong: 'r-in-long', inShort: 'r-in-short' };
+  var rates = loadRates();
+  var mode = 'out';
+  var region = 'seoul';
+  var lastResult = null;
+  var mobileMQ = window.matchMedia('(max-width: 720px)');
+
+  function $(id) { return document.getElementById(id); }
+  function won(n) { return Math.round(n).toLocaleString('ko-KR') + '원'; }
+  function fmt(n) { return Math.round(n).toLocaleString('ko-KR'); }
+  function getNum(id) {
+    var s = ($(id).value || '').replace(/[^0-9.]/g, '');
+    var v = parseFloat(s);
+    return isFinite(v) && v > 0 ? v : 0;
+  }
+  function safeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function safeSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+
+  function loadRates() {
+    var r = Object.assign({}, DEFAULTS);
+    try {
+      var s = safeGet(RATE_KEY);
+      if (s) { var p = JSON.parse(s); Object.keys(DEFAULTS).forEach(function (k) { if (isFinite(p[k])) r[k] = p[k]; }); }
+    } catch (e) {}
+    return r;
+  }
+
+  /* 금액 입력칸: 숫자만 받고 천 단위 쉼표를 자동으로 붙임 (커서 위치 유지) */
+  function formatMoneyInput(el) {
+    var pos = el.selectionStart;
+    var before = el.value;
+    var digitsBeforeCaret = before.slice(0, pos == null ? before.length : pos).replace(/[^0-9]/g, '').length;
+    var digits = before.replace(/[^0-9]/g, '').replace(/^0+(?=\d)/, '');
+    var out = digits === '' ? '' : Number(digits).toLocaleString('ko-KR');
+    el.value = out;
+    var p = 0, seen = 0;
+    while (p < out.length && seen < digitsBeforeCaret) { if (/\d/.test(out[p])) seen++; p++; }
+    try { el.setSelectionRange(p, p); } catch (e) {}
+  }
+  function formatHoursInput(el) {
+    var v = el.value.replace(/[^0-9.]/g, '');
+    var parts = v.split('.');
+    if (parts.length > 2) v = parts[0] + '.' + parts.slice(1).join('');
+    el.value = v;
+  }
+  function setMoney(id, n) { $(id).value = n > 0 ? fmt(n) : ''; }
+
+  function toUTC(str) {
+    if (!str) return null;
+    var p = str.split('-');
+    if (p.length !== 3) return null;
+    return Date.UTC(+p[0], +p[1] - 1, +p[2]);
+  }
+  function fromUTC(ms) {
+    var d = new Date(ms);
+    return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+  }
+  function todayStr() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function nightsNow() {
+    var a = toUTC($('dep').value), b = toUTC($('arr').value);
+    if (a === null || b === null || b < a) return null;
+    return Math.round((b - a) / 86400000);
+  }
+
+  function compute() {
+    var res = { rows: [], total: 0, period: '', msgs: [], error: '' };
+    if (mode === 'in') {
+      var h = getNum('hours');
+      var amt = h >= 4 ? rates.inLong : rates.inShort;
+      res.rows.push({ name: '근무지 내', calc: (h >= 4 ? '4시간 이상' : '4시간 미만') + ' 정액', amount: amt });
+      res.total = amt;
+      res.period = h > 0 ? '출장 시간 ' + h + '시간' : '출장 시간을 입력하세요';
+      return res;
+    }
+    var n = nightsNow();
+    if (toUTC($('dep').value) === null || toUTC($('arr').value) === null) { res.error = '출발일과 도착일을 입력하세요.'; return res; }
+    if (n === null) { res.error = '도착일이 출발일보다 빠릅니다.'; return res; }
+    var days = n + 1, nights = n;
+    var cap = rates[region];
+    var lodging = getNum('lodging');
+    var transport = getNum('transport');
+    var recognized = Math.min(lodging, cap);
+    var daily = days * rates.daily;
+    var meal = days * rates.meal;
+    var stay = nights * recognized;
+    res.rows = [
+      { name: '일비', calc: days + '일 x ' + won(rates.daily), amount: daily },
+      { name: '식비', calc: days + '일 x ' + won(rates.meal), amount: meal },
+      { name: '숙박', calc: nights + '박 x ' + won(recognized) + (lodging > cap ? ' (상한 적용)' : ''), amount: stay },
+      { name: '교통', calc: '실비', amount: transport }
+    ];
+    res.total = daily + meal + stay + transport;
+    res.period = (nights > 0 ? nights + '박 ' : '당일 ') + days + '일 / ' + REGION_NAME[region];
+    if (nights > 0 && lodging > cap) {
+      res.msgs.push('숙박비 상한 ' + won(cap) + ' 초과, ' + won((lodging - cap) * nights) + ' 불인정');
+    }
+    return res;
+  }
+
+  function icons() { if (window.lucide && lucide.createIcons) { try { lucide.createIcons(); } catch (e) {} } }
+
+  function render() {
+    var r = compute();
+    lastResult = r;
+    var mini = $('mini'), msgs = $('msgs'), body = $('result-body');
+    mini.innerHTML = ''; msgs.innerHTML = ''; body.innerHTML = '';
+
+    // 빠른 선택 상태 표시
+    var n = nightsNow();
+    document.querySelectorAll('#chips button').forEach(function (b) { b.classList.toggle('on', n !== null && +b.getAttribute('data-n') === n); });
+    var h = getNum('hours');
+    document.querySelectorAll('#hour-chips button').forEach(function (b) { b.classList.toggle('on', h > 0 && +b.getAttribute('data-h') === h); });
+
+    if (r.error) {
+      $('total').textContent = '0원';
+      $('period').textContent = '';
+      msgs.innerHTML = '<div class="alert error"><i data-lucide="circle-alert"></i><span>' + r.error + '</span></div>';
+      body.innerHTML = '<tr><td colspan="3">' + r.error + '</td></tr>';
+      icons();
+      return;
+    }
+    $('total').textContent = won(r.total);
+    $('period').textContent = r.period;
+    r.rows.forEach(function (row) {
+      var li = document.createElement('li');
+      li.innerHTML = '<span>' + row.name + '</span><span>' + fmt(row.amount) + '<i class="w">원</i></span>';
+      if (mode === 'out' || true) mini.appendChild(li);
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + row.name + '</td><td class="calc">' + row.calc + '</td><td class="num">' + won(row.amount) + '</td>';
+      body.appendChild(tr);
+    });
+    var sum = document.createElement('tr');
+    sum.className = 'sum';
+    sum.innerHTML = '<td>합계</td><td class="calc">' + r.period + '</td><td class="num">' + won(r.total) + '</td>';
+    body.appendChild(sum);
+    r.msgs.forEach(function (m) {
+      var d = document.createElement('div');
+      d.className = 'alert';
+      d.innerHTML = '<i data-lucide="triangle-alert"></i><span>' + m + '</span>';
+      msgs.appendChild(d);
+    });
+    icons();
+    saveLast();
+  }
+
+  function saveLast() {
+    safeSet(LAST_KEY, JSON.stringify({ mode: mode, region: region, lodging: getNum('lodging'), transport: getNum('transport'), hours: getNum('hours') }));
+  }
+
+  function setMode(m) {
+    mode = m;
+    $('mode-out').classList.toggle('on', m === 'out');
+    $('mode-in').classList.toggle('on', m === 'in');
+    $('mode-out').setAttribute('aria-checked', m === 'out');
+    $('mode-in').setAttribute('aria-checked', m === 'in');
+    $('fields-out').classList.toggle('hide', m !== 'out');
+    $('fields-in').classList.toggle('hide', m !== 'in');
+    render();
+  }
+  function setRegion(r) {
+    region = r;
+    document.querySelectorAll('#region-seg button').forEach(function (b) {
+      var on = b.getAttribute('data-r') === r;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-checked', on);
+    });
+  }
+
+  function showTab(name) {
+    document.querySelectorAll('.panel').forEach(function (p) { p.classList.toggle('active', p.id === 'tab-' + name); });
+    document.querySelectorAll('nav button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === name); });
+    $('reset-calc').classList.toggle('hide', name !== 'calc');
+  }
+
+  // 계산 입력값 초기화: 당일, 서울, 금액 비움 (기준 금액은 유지)
+  function resetCalc() {
+    var t = todayStr();
+    $('dep').value = t; $('arr').value = t;
+    $('lodging').value = ''; $('transport').value = ''; $('hours').value = '';
+    setRegion('seoul');
+    try { localStorage.removeItem(LAST_KEY); } catch (e) {}
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    setMode('out');
+    flash('copy-note', '입력을 초기화했습니다.');
+    var ic = document.querySelector('#tab-calc .input-card'); if (ic) ic.scrollTop = 0;
+  }
+
+  function fillRates() { Object.keys(RATE_MAP).forEach(function (k) { setMoney(RATE_MAP[k], rates[k]); }); }
+
+  function flash(id, text) {
+    var el = $(id); el.textContent = text;
+    clearTimeout(el._t);
+    el._t = setTimeout(function () { el.textContent = ''; }, 2200);
+  }
+
+  function copyText(noteId) {
+    if (!lastResult || lastResult.error) { flash(noteId, '복사할 결과가 없습니다.'); return; }
+    var lines = ['[국내 출장비 계산 결과]', lastResult.period];
+    lastResult.rows.forEach(function (row) { lines.push(row.name + ': ' + won(row.amount) + ' (' + row.calc + ')'); });
+    lines.push('합계: ' + won(lastResult.total));
+    var text = lines.join('\n');
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); flash(noteId, '복사했습니다.'); } catch (e) { flash(noteId, '복사하지 못했습니다.'); }
+      document.body.removeChild(ta);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { flash(noteId, '복사했습니다.'); }, fallback);
+    } else { fallback(); }
+  }
+
+  function init() {
+    // 마지막 입력값 복원 (날짜는 항상 오늘 기준)
+    var last = {};
+    try { last = JSON.parse(safeGet(LAST_KEY) || '{}'); } catch (e) {}
+    var t = todayStr();
+    $('dep').value = t;
+    // 처음 열면 예시(2박 3일), 이전에 사용했거나 초기화했다면 당일로 시작
+    $('arr').value = last && last.region ? t : fromUTC(toUTC(t) + 2 * 86400000);
+    setMoney('lodging', last.lodging != null ? last.lodging : 120000);
+    setMoney('transport', last.transport != null ? last.transport : 50000);
+    $('hours').value = last.hours ? String(last.hours) : '5';
+    if (REGION_NAME[last.region]) region = last.region;
+    setRegion(region);
+    fillRates();
+
+    // 입력
+    ['lodging', 'transport'].forEach(function (id) {
+      $(id).addEventListener('input', function () { formatMoneyInput($(id)); render(); });
+    });
+    $('hours').addEventListener('input', function () { formatHoursInput($('hours')); render(); });
+    Object.keys(RATE_MAP).forEach(function (k) {
+      $(RATE_MAP[k]).addEventListener('input', function () { formatMoneyInput($(RATE_MAP[k])); });
+    });
+    // 포커스 시 전체 선택: 바로 덮어쓰기 가능
+    ['lodging', 'transport', 'hours'].concat(Object.keys(RATE_MAP).map(function (k) { return RATE_MAP[k]; })).forEach(function (id) {
+      $(id).addEventListener('focus', function () { var el = $(id); setTimeout(function () { try { el.select(); } catch (e) {} }, 0); });
+    });
+    // 엔터: 다음 칸으로 이동, 마지막 칸은 키보드 닫기
+    $('lodging').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('transport').focus(); } });
+    ['transport', 'hours'].forEach(function (id) {
+      $(id).addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $(id).blur(); } });
+    });
+
+    // 날짜: 출발일을 바꾸면 기간(박수)을 유지한 채 도착일을 함께 이동
+    var prevNights = 2;
+    $('dep').addEventListener('focus', function () { var n = nightsNow(); if (n !== null) prevNights = n; });
+    $('dep').addEventListener('change', function () {
+      var n = nightsNow(); if (n === null) n = prevNights;
+      var d = toUTC($('dep').value);
+      if (d !== null) $('arr').value = fromUTC(d + n * 86400000);
+      render();
+    });
+    $('arr').addEventListener('change', render);
+    $('arr').addEventListener('input', render);
+
+    // 기간 빠른 선택 (한 번 터치)
+    document.querySelectorAll('#chips button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var d = toUTC($('dep').value); if (d === null) { d = toUTC(todayStr()); $('dep').value = todayStr(); }
+        $('arr').value = fromUTC(d + (+b.getAttribute('data-n')) * 86400000);
+        render();
+      });
+    });
+    document.querySelectorAll('#hour-chips button').forEach(function (b) {
+      b.addEventListener('click', function () { $('hours').value = b.getAttribute('data-h'); render(); });
+    });
+    document.querySelectorAll('#region-seg button').forEach(function (b) {
+      b.addEventListener('click', function () { setRegion(b.getAttribute('data-r')); render(); });
+    });
+
+    $('mode-out').addEventListener('click', function () { setMode('out'); });
+    $('mode-in').addEventListener('click', function () { setMode('in'); });
+    document.querySelectorAll('nav button').forEach(function (b) {
+      b.addEventListener('click', function () { showTab(b.getAttribute('data-tab')); });
+    });
+    $('copy').addEventListener('click', function () { copyText('toast'); });
+    $('reset-calc').addEventListener('click', resetCalc);
+    $('copy-quick').addEventListener('click', function () { copyText('copy-note'); });
+
+    $('save').addEventListener('click', function () {
+      var next = {};
+      Object.keys(RATE_MAP).forEach(function (k) { var v = getNum(RATE_MAP[k]); next[k] = $(RATE_MAP[k]).value === '' ? DEFAULTS[k] : v; });
+      rates = next;
+      var ok = safeSet(RATE_KEY, JSON.stringify(rates));
+      flash('rate-toast', ok ? '저장했습니다.' : '이 화면에서만 적용됩니다.');
+      fillRates(); render();
+      document.activeElement && document.activeElement.blur && document.activeElement.blur();
+    });
+    $('reset').addEventListener('click', function () {
+      rates = Object.assign({}, DEFAULTS);
+      try { localStorage.removeItem(RATE_KEY); } catch (e) {}
+      fillRates(); render(); flash('rate-toast', '기본값으로 되돌렸습니다.');
+    });
+
+    // 키보드가 열리면 하단 탭을 숨기고, 입력칸을 화면 안으로 이동
+    var app = $('app');
+    document.addEventListener('focusin', function (e) {
+      if (e.target && e.target.tagName === 'INPUT' && mobileMQ.matches) {
+        app.classList.add('typing');
+        setTimeout(function () { try { e.target.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (x) {} }, 250);
+      }
+    });
+    // 입력칸 밖을 터치하면 키보드를 닫는다 (버튼, 칩, 빈 곳 모두 한 번에 동작)
+    document.addEventListener('pointerdown', function (e) {
+      var a = document.activeElement;
+      if (a && a.tagName === 'INPUT' && e.target !== a && !(e.target.closest && e.target.closest('.unit-wrap, input'))) a.blur();
+    });
+    document.addEventListener('focusout', function () {
+      setTimeout(function () {
+        var a = document.activeElement;
+        if (!a || a.tagName !== 'INPUT') app.classList.remove('typing');
+      }, 80);
+    });
+
+    if (last.mode === 'in') setMode('in'); else render();
+    icons();
+  }
+  init();
+})();
+</script>
+</body>
+</html>
